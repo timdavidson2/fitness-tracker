@@ -1,59 +1,63 @@
-const Workout = require("../models/workout.js");
+const router = require("express").Router();
+const Workout = require("../models/workouts");
 
-module.exports = function (app) {
-  // Get past workouts
-  app.get("/api/workouts", function (req, res) {
-    Workout.aggregate([
-      // 1. Find all workouts
-      { $match: {} },
-
-      // 2. Add the new totalDuration field which is the sum of all exercise durations
-      { $addFields: { totalDuration: { $sum: "$exercises.duration" } } },
-    ])
-      .then((dbWorkout) => {
-        res.json(dbWorkout);
-      })
-      .catch((err) => {
-        res.status(400).json(err);
-      });
-  });
-
-  // Create new workout
-  app.post("/api/workouts", function (req, res) {
-    Workout.create(req.body)
-      .then((dbWorkout) => {
-        res.json(dbWorkout);
-      })
-      .catch((err) => {
-        res.status(400).json(err);
-      });
-  });
-
-  // Add an exercise
-  app.put("/api/workouts/:id", function (req, res) {
-    let exercise = req.body;
-    Workout.updateOne(
-      { _id: req.params.id },
-      { $push: { exercises: exercise } }
-    ).then(function (dbWorkout) {
-      res.json(dbWorkout);
+router.get("/api/workouts", (req, res) => {
+  Workout.aggregate([
+    {
+      $addFields: {
+        totalDuration: {
+          $sum: "$exercises.duration",
+        },
+      },
+    },
+  ])
+    .then((dbWorkouts) => {
+      res.json(dbWorkouts);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.json(err);
     });
-  });
+});
 
-  // Get all workouts (... this time for stats...?)
-  app.get("/api/workouts/range", function (req, res) {
-    Workout.aggregate([
-      // 1. Find all workouts
-      { $match: {} },
+router.put("/api/workouts/:id", async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.id);
+    workout.exercises.push(req.body);
+    await workout.save();
+    res.status(200).json(workout);
+  } catch (err) {
+    console.log(err);
+    res.status(400).json(err);
+  }
+});
 
-      // 2. Add the new totalDuration field which is the sum of all exercise durations
-      { $addFields: { totalDuration: { $sum: "$exercises.duration" } } },
-    ])
-      .then((dbWorkout) => {
-        res.json(dbWorkout);
-      })
-      .catch((err) => {
-        res.status(400).json(err);
-      });
-  });
-};
+router.post("/api/workouts", (req, res) => {
+  Workout.create({})
+    .then((workout) => {
+      res.json(workout);
+    })
+    .catch((err) => {
+      res.status(400).json(err);
+    });
+});
+
+router.get("/api/workouts/range", (req, res) => {
+  Workout.aggregate([
+    {
+      $addFields: {
+        totalDuration: {
+          $sum: "$exercises.duration",
+        },
+      },
+    },
+  ])
+    .then((dbWorkout) => {
+      res.json(dbWorkout);
+    })
+    .catch((err) => {
+      console.log(err), res.json(err);
+    });
+});
+
+module.exports = router;
